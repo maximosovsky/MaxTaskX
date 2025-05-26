@@ -410,6 +410,53 @@ call mom`;
         );
       };
 
+      // Confetti animation function
+      const createConfetti = () => {
+        const confettiContainer = document.createElement('div');
+        confettiContainer.style.position = 'fixed';
+        confettiContainer.style.top = '0';
+        confettiContainer.style.left = '0';
+        confettiContainer.style.width = '100%';
+        confettiContainer.style.height = '100%';
+        confettiContainer.style.pointerEvents = 'none';
+        confettiContainer.style.zIndex = '9999';
+        document.body.appendChild(confettiContainer);
+
+        const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8'];
+        
+        for (let i = 0; i < 50; i++) {
+          const confetti = document.createElement('div');
+          confetti.style.position = 'absolute';
+          confetti.style.width = '10px';
+          confetti.style.height = '10px';
+          confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+          confetti.style.left = Math.random() * 100 + '%';
+          confetti.style.top = '-10px';
+          confetti.style.borderRadius = '50%';
+          confetti.style.animation = `confetti-fall ${2 + Math.random() * 3}s linear forwards`;
+          confettiContainer.appendChild(confetti);
+        }
+
+        // Add CSS animation
+        if (!document.getElementById('confetti-styles')) {
+          const style = document.createElement('style');
+          style.id = 'confetti-styles';
+          style.textContent = `
+            @keyframes confetti-fall {
+              to {
+                transform: translateY(100vh) rotate(360deg);
+                opacity: 0;
+              }
+            }
+          `;
+          document.head.appendChild(style);
+        }
+
+        setTimeout(() => {
+          document.body.removeChild(confettiContainer);
+        }, 5000);
+      };
+
       // Main App Component
       const App = () => {
         const [tasks, setTasks] = useState([]);
@@ -419,6 +466,7 @@ call mom`;
         const [showReminder, setShowReminder] = useState(false);
         const [reminderData, setReminderData] = useState(null);
         const [currentTime, setCurrentTime] = useState(new Date());
+        const [coins, setCoins] = useState(0);
 
         // Update current time every minute
         useEffect(() => {
@@ -431,6 +479,11 @@ call mom`;
         // Load initial data
         useEffect(() => {
           loadInitialData();
+          // Load coins from localStorage
+          const savedCoins = localStorage.getItem('task_reminder_coins');
+          if (savedCoins) {
+            setCoins(parseInt(savedCoins, 10));
+          }
         }, []);
 
         const loadInitialData = async () => {
@@ -475,6 +528,12 @@ call mom`;
             });
             
             setCompletedTasks(prev => [...prev, taskId]);
+            
+            // Add coin and show confetti
+            const newCoins = coins + 1;
+            setCoins(newCoins);
+            localStorage.setItem('task_reminder_coins', newCoins.toString());
+            createConfetti();
           } catch (error) {
             console.error('Failed to complete task:', error);
           }
@@ -531,11 +590,14 @@ call mom`;
           <div className="min-h-screen bg-gray-50">
             <div className="max-w-4xl mx-auto p-4">
               <header className="py-6 border-b border-gray-200 mb-6">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">📋 Task Reminder</h1>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-2">
+                  <h1 className="text-3xl font-bold text-gray-900">🪙 {coins} coins</h1>
                   <div className="text-sm text-gray-600">
                     Current time: <span className="font-mono font-semibold">{getCurrentTimeFormatted()}</span>
                   </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div></div>
                   <div className="flex items-center gap-4">
                     <WorkingMode 
                       workingMode={workingMode}
@@ -552,31 +614,6 @@ call mom`;
               </header>
 
               <main className="space-y-6">
-                {/* Current Status */}
-                <div className="card">
-                  <h2 className="text-xl font-semibold mb-4">📊 Current Status</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">
-                        {getTimedTasksForCurrentTime().length}
-                      </div>
-                      <div className="text-sm text-gray-600">Current Timed Tasks</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-orange-600">
-                        {getIncompleteGeneralTasks().length}
-                      </div>
-                      <div className="text-sm text-gray-600">Incomplete General Tasks</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">
-                        {tasks.filter(t => completedTasks.includes(t.id)).length}
-                      </div>
-                      <div className="text-sm text-gray-600">Completed Today</div>
-                    </div>
-                  </div>
-                </div>
-
                 {/* All Tasks in User Input Order */}
                 <div className="card">
                   <div className="flex items-center justify-between mb-4">
