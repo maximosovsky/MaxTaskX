@@ -480,6 +480,10 @@ call mom`;
           }
         };
 
+        const isTaskCompleted = (taskId) => {
+          return completedTasks.includes(taskId);
+        };
+
         const handleWorkingModeToggle = async (enabled) => {
           try {
             const response = await fetch('/api/working-mode', {
@@ -566,68 +570,45 @@ call mom`;
                     </div>
                     <div className="text-center">
                       <div className="text-2xl font-bold text-green-600">
-                        {generalTasks.filter(t => completedTasks.includes(t.id)).length}
+                        {tasks.filter(t => completedTasks.includes(t.id)).length}
                       </div>
                       <div className="text-sm text-gray-600">Completed Today</div>
                     </div>
                   </div>
                 </div>
 
-                {/* Timed Tasks */}
+                {/* All Tasks in User Input Order */}
                 <div className="card">
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-semibold">⏰ Timed Tasks</h2>
-                    <span className="text-sm text-gray-500">{timedTasks.length} tasks</span>
+                    <h2 className="text-xl font-semibold">📝 Tasks</h2>
+                    <span className="text-sm text-gray-500">
+                      {tasks.filter(t => completedTasks.includes(t.id)).length}/{tasks.length} completed
+                    </span>
                   </div>
                   
-                  {timedTasks.length === 0 ? (
+                  {tasks.length === 0 ? (
                     <div className="text-center py-8 text-gray-500">
-                      No timed tasks configured. Click "Edit Tasks" to add some.
+                      No tasks configured. Click "Edit Tasks" to add some.
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      {timedTasks
-                        .sort((a, b) => a.time.localeCompare(b.time))
-                        .map(task => (
-                          <div key={task.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                            <div className="flex items-center">
+                      {tasks.map(task => (
+                        <div key={task.id} className={`flex items-center justify-between p-3 border border-gray-200 rounded-lg ${isTaskCompleted(task.id) ? 'bg-green-50 opacity-60' : ''}`}>
+                          <div className="flex items-center flex-1">
+                            {task.type === 'timed' && (
                               <span className={`font-mono font-semibold mr-3 ${task.time === getCurrentTimeFormatted() ? 'text-red-600' : 'text-blue-600'}`}>
                                 {task.time}
                               </span>
-                              <span>{task.description}</span>
-                            </div>
-                            {task.time === getCurrentTimeFormatted() && (
+                            )}
+                            <span className={isTaskCompleted(task.id) ? 'line-through' : ''}>{task.description}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {task.type === 'timed' && task.time === getCurrentTimeFormatted() && (
                               <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs font-medium">
                                 Now
                               </span>
                             )}
-                          </div>
-                        ))
-                      }
-                    </div>
-                  )}
-                </div>
-
-                {/* General Tasks */}
-                <div className="card">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-semibold">📋 General Tasks</h2>
-                    <span className="text-sm text-gray-500">
-                      {generalTasks.filter(t => completedTasks.includes(t.id)).length}/{generalTasks.length} completed
-                    </span>
-                  </div>
-                  
-                  {generalTasks.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      No general tasks configured. Click "Edit Tasks" to add some.
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {generalTasks.map(task => (
-                        <div key={task.id} className={`flex items-center justify-between p-3 border border-gray-200 rounded-lg ${completedTasks.includes(task.id) ? 'bg-green-50 opacity-60' : ''}`}>
-                          <span className={completedTasks.includes(task.id) ? 'line-through' : ''}>{task.description}</span>
-                          <div className="flex items-center gap-2">
-                            {completedTasks.includes(task.id) ? (
+                            {isTaskCompleted(task.id) ? (
                               <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">
                                 ✓
                               </span>
