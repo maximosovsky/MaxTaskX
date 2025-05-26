@@ -410,6 +410,34 @@ call mom`;
         );
       };
 
+      // Sound function
+      const playCoinSound = () => {
+        try {
+          // Create Web Audio API context for coin sound
+          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          
+          // Create oscillator for coin sound
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
+          // Coin sound - quick high-pitched ding
+          oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+          oscillator.frequency.exponentialRampToValueAtTime(1200, audioContext.currentTime + 0.1);
+          oscillator.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.3);
+          
+          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+          
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.3);
+        } catch (error) {
+          console.log('Sound not available');
+        }
+      };
+
       // Confetti animation function
       const createConfetti = () => {
         const confettiContainer = document.createElement('div');
@@ -467,6 +495,7 @@ call mom`;
         const [reminderData, setReminderData] = useState(null);
         const [currentTime, setCurrentTime] = useState(new Date());
         const [coins, setCoins] = useState(0);
+        const [soundEnabled, setSoundEnabled] = useState(true);
 
         // Update current time every minute
         useEffect(() => {
@@ -483,6 +512,11 @@ call mom`;
           const savedCoins = localStorage.getItem('task_reminder_coins');
           if (savedCoins) {
             setCoins(parseInt(savedCoins, 10));
+          }
+          // Load sound setting
+          const savedSound = localStorage.getItem('task_reminder_sound');
+          if (savedSound !== null) {
+            setSoundEnabled(savedSound === 'true');
           }
         }, []);
 
@@ -534,6 +568,11 @@ call mom`;
             setCoins(newCoins);
             localStorage.setItem('task_reminder_coins', newCoins.toString());
             createConfetti();
+            
+            // Play sound if enabled
+            if (soundEnabled) {
+              playCoinSound();
+            }
           } catch (error) {
             console.error('Failed to complete task:', error);
           }
@@ -541,6 +580,12 @@ call mom`;
 
         const isTaskCompleted = (taskId) => {
           return completedTasks.includes(taskId);
+        };
+
+        const toggleSound = () => {
+          const newSoundState = !soundEnabled;
+          setSoundEnabled(newSoundState);
+          localStorage.setItem('task_reminder_sound', newSoundState.toString());
         };
 
         const handleWorkingModeToggle = async (enabled) => {
@@ -608,6 +653,13 @@ call mom`;
                       onClick={() => setShowEditor(true)}
                     >
                       ✏️ Edit Tasks
+                    </button>
+                    <button 
+                      className={`btn ${soundEnabled ? 'btn-warning' : 'btn-secondary bg-gray-500 text-white'}`}
+                      onClick={toggleSound}
+                      title={soundEnabled ? 'Disable sound' : 'Enable sound'}
+                    >
+                      {soundEnabled ? '🔊' : '🔇'}
                     </button>
                   </div>
                 </div>
