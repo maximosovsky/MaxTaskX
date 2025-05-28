@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { useGoogleLogin } from '@react-oauth/google';
 import TaskEditor from './components/TaskEditor';
 import TaskList from './components/TaskList';
 import WorkingMode from './components/WorkingMode';
 import ReminderPopup from './components/ReminderPopup';
-import { loadTasks, saveTasks } from './utils/storage';
-import { startReminderSystem } from './utils/reminderSystem';
+import Leaderboard from './components/Leaderboard';
+import { playMonetSound, showConfetti } from './utils/animations';
+import { checkScreenState } from './utils/androidBridge';
 
 function App() {
+  const [user, setUser] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [completedTasks, setCompletedTasks] = useState([]);
   const [workingMode, setWorkingMode] = useState({ active: false, until: null });
@@ -14,6 +17,41 @@ function App() {
   const [showReminder, setShowReminder] = useState(false);
   const [reminderData, setReminderData] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [tokens, setTokens] = useState(0);
+  const [beepInterval, setBeepInterval] = useState(null);
+
+  const login = useGoogleLogin({
+    onSuccess: (codeResponse) => {
+      setUser(codeResponse);
+      syncWithGoogleDocs(codeResponse.access_token);
+    },
+    onError: (error) => console.log('Login Failed:', error)
+  });
+
+  useEffect(() => {
+    // Set up 20-minute beep interval
+    const interval = setInterval(() => {
+      const audio = new Audio('beep.mp3');
+      audio.play();
+    }, 20 * 60 * 1000);
+    
+    setBeepInterval(interval);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    // Check screen state every minute
+    const screenCheckInterval = setInterval(async () => {
+      const isScreenActive = await checkScreenState();
+      if (!isScreenActive) {
+        // Hide any active reminders
+        setShowReminder(false);
+      }
+    }, 60000);
+
+    return () => clearInterval(screenCheckInterval);
+  }, []);
 
   // Update current time every minute
   useEffect(() => {
@@ -77,17 +115,23 @@ function App() {
   };
 
   const handleTaskComplete = async (taskId) => {
+    setCompletedTasks(prev => [...prev, taskId]);
+    setTokens(prev => prev + 1);
+    playMonetSound();
+    showConfetti();
+    
+    if (user) {
+      await syncCompletedTask(taskId, user.access_token);
+    }
+
     try {
       await fetch('/api/complete-task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ taskId })
       });
-      
-      setCompletedTasks(prev => [...prev, taskId]);
     } catch (error) {
       console.error('Failed to complete task:', error);
-      setCompletedTasks(prev => [...prev, taskId]);
     }
   };
 
@@ -160,74 +204,42 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container">
-        <header className="py-6 border-b border-gray-200 mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">📋 Task Reminder</h1>
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-600">
-              Current time: <span className="font-mono font-semibold">{getCurrentTimeFormatted()}</span>
-            </div>
+    <div className="min-h-screen bg-gray-100">
+      <div className="max-w-4xl mx-auto p-4">
+        <header className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">Task Reminder</h1>
+          {!user ? (
+            <button onClick={() => login()} className="btn btn-primary">
+              Sign in with Google
+            </button>
+          ) : (
             <div className="flex items-center gap-4">
-              <WorkingMode 
-                workingMode={workingMode}
-                onToggle={handleWorkingModeToggle}
-              />
-              <button 
-                className="btn btn-primary"
-                onClick={() => setShowEditor(true)}
-              >
-                ✏️ Edit Tasks
-              </button>
+              <span>🪙 {tokens} tokens</span>
+              <img src={user.picture} alt="Profile" className="w-8 h-8 rounded-full" />
             </div>
-          </div>
+          )}
         </header>
 
+        <WorkingMode workingMode={workingMode} onToggle={handleWorkingModeToggle} />
+        
         <main className="space-y-6">
-          {/* Current Status */}
-          <div className="card">
-            <h2 className="text-xl font-semibold mb-4">📊 Current Status</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">
-                  {getTimedTasksForCurrentTime().length}
-                </div>
-                <div className="text-sm text-gray-600">Current Timed Tasks</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">
-                  {getIncompleteGeneralTasks().length}
-                </div>
-                <div className="text-sm text-gray-600">Incomplete General Tasks</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">
-                  {tasks.filter(t => t.type === 'general' && completedTasks.includes(t.id)).length}
-                </div>
-                <div className="text-sm text-gray-600">Completed Today</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Task Lists */}
           <TaskList 
             tasks={tasks}
             completedTasks={completedTasks}
             onTaskComplete={handleTaskComplete}
-            currentTime={getCurrentTimeFormatted()}
           />
+          
+          <Leaderboard />
         </main>
 
-        {/* Task Editor Modal */}
         {showEditor && (
-          <TaskEditor 
+          <TaskEditor
             tasks={tasks}
             onSave={handleTasksSave}
             onClose={() => setShowEditor(false)}
           />
         )}
 
-        {/* Reminder Popup */}
         {showReminder && reminderData && (
           <ReminderPopup 
             reminderData={reminderData}
