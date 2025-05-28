@@ -6,7 +6,8 @@ import WorkingMode from './components/WorkingMode';
 import ReminderPopup from './components/ReminderPopup';
 import Leaderboard from './components/Leaderboard';
 import { playMonetSound, showConfetti } from './utils/animations';
-import { checkScreenState } from './utils/androidBridge';
+import { startReminderSystem } from './utils/reminderSystem';
+import { loadTasks, saveTasks } from './utils/storage';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -18,40 +19,13 @@ function App() {
   const [reminderData, setReminderData] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [tokens, setTokens] = useState(0);
-  const [beepInterval, setBeepInterval] = useState(null);
 
   const login = useGoogleLogin({
     onSuccess: (codeResponse) => {
       setUser(codeResponse);
-      syncWithGoogleDocs(codeResponse.access_token);
     },
     onError: (error) => console.log('Login Failed:', error)
   });
-
-  useEffect(() => {
-    // Set up 20-minute beep interval
-    const interval = setInterval(() => {
-      const audio = new Audio('beep.mp3');
-      audio.play();
-    }, 20 * 60 * 1000);
-    
-    setBeepInterval(interval);
-    
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    // Check screen state every minute
-    const screenCheckInterval = setInterval(async () => {
-      const isScreenActive = await checkScreenState();
-      if (!isScreenActive) {
-        // Hide any active reminders
-        setShowReminder(false);
-      }
-    }, 60000);
-
-    return () => clearInterval(screenCheckInterval);
-  }, []);
 
   // Update current time every minute
   useEffect(() => {
@@ -119,10 +93,6 @@ function App() {
     setTokens(prev => prev + 1);
     playMonetSound();
     showConfetti();
-    
-    if (user) {
-      await syncCompletedTask(taskId, user.access_token);
-    }
 
     try {
       await fetch('/api/complete-task', {
@@ -182,25 +152,6 @@ function App() {
         setShowReminder(true);
       }
     }, 5 * 60 * 1000); // 5 minutes
-  };
-
-  const getCurrentTimeFormatted = () => {
-    return currentTime.toLocaleTimeString('en-US', { 
-      hour12: false, 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
-  };
-
-  const getTimedTasksForCurrentTime = () => {
-    const currentTimeStr = getCurrentTimeFormatted();
-    return tasks.filter(task => task.type === 'timed' && task.time === currentTimeStr);
-  };
-
-  const getIncompleteGeneralTasks = () => {
-    return tasks.filter(task => 
-      task.type === 'general' && !completedTasks.includes(task.id)
-    );
   };
 
   return (
